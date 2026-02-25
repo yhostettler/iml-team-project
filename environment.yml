@@ -1,0 +1,16 @@
+﻿name: IML
+channels:
+  - defaults
+dependencies:
+  - python=3.10
+  - numpy
+  - scikit-learn
+  - matplotlib
+  - pandas
+  - seaborn
+  - scipy
+  - pip
+  - pip:
+      - torch
+      - torchvision
+      - torchaudio
