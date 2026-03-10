@@ -26,9 +26,10 @@ def fit(X, y, lam):
     w: array of floats: dim = (13,), optimal parameters of ridge regression
     """
     weights = np.zeros((13,))
-
-    I = np.eye(X.shape[1])
-    weights = np.linalg.inv(X.T@X + lam*I)@X.T@y
+    # TODO: Enter your code here
+    d = X.shape[1]
+    I = np.eye(d)
+    weights = np.linalg.inv(X.T @ X + lam * I) @ X.T @ y
 
     assert weights.shape == (13,)
     return weights
@@ -81,6 +82,18 @@ def average_LR_RMSE(X, y, lambdas, n_folds):
 
     # TODO: Enter your code here. Hint: Use functions 'fit' and 'calculate_RMSE' with training and test data
     # and fill all entries in the matrix 'RMSE_mat'
+    kf = KFold(n_splits=n_folds)
+    
+    for i, (train_idx, test_idx) in enumerate(kf.split(X)):
+        X_train, X_test = X[train_idx], X[test_idx]
+        y_train, y_test = y[train_idx], y[test_idx]
+
+        for j, lamb in enumerate(lambdas):
+
+            w = fit(X_train, y_train, lamb)
+            rmse = calculate_RMSE(w, X_test, y_test)
+
+            RMSE_mat[i, j] = rmse
 
     avg_RMSE = np.mean(RMSE_mat, axis=0)
     assert avg_RMSE.shape == (5,)
