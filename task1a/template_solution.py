@@ -26,7 +26,10 @@ def fit(X, y, lam):
     w: array of floats: dim = (13,), optimal parameters of ridge regression
     """
     weights = np.zeros((13,))
-    # TODO: Enter your code here
+
+    I = np.eye(X.shape[1])
+    weights = np.linalg.inv(X.T@X + lam*I)@X.T@y
+
     assert weights.shape == (13,)
     return weights
 
