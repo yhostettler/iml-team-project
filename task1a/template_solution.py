@@ -46,7 +46,14 @@ def calculate_RMSE(w, X, y):
     rmse: float: dim = 1, RMSE value
     """
     rmse = 0
-    # TODO: Enter your code here
+
+    y_pred = X@w
+
+    for i in range(y.size):
+        rmse += (y[i] - y_pred[i])**2
+
+    rmse = np.sqrt(rmse/y.size).item()
+
     assert np.isscalar(rmse)
     return rmse
 
