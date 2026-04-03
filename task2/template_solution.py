@@ -8,11 +8,15 @@ from sklearn.base import BaseEstimator, TransformerMixin, clone
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import ExtraTreesRegressor
 from sklearn.impute import SimpleImputer
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, Ridge, Lasso
 from sklearn.metrics import r2_score
 from sklearn.model_selection import KFold
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
+
+from sklearn.ensemble import GradientBoostingRegressor
+
+
 
 RANDOM_STATE = 42
 
@@ -26,14 +30,14 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
         X = X.copy()
         price_df = X[self.price_cols_]
 
-        X["price_mean"] = price_df.mean(axis=1, skipna=True)
-        X["price_median"] = price_df.median(axis=1, skipna=True)
-        X["price_std"] = price_df.std(axis=1, skipna=True)
-        X["price_min"] = price_df.min(axis=1, skipna=True)
-        X["price_max"] = price_df.max(axis=1, skipna=True)
-        X["price_range"] = X["price_max"] - X["price_min"]
-        X["price_missing_count"] = price_df.isna().sum(axis=1)
-        X["price_present_count"] = price_df.notna().sum(axis=1)
+        # X["price_mean"] = price_df.mean(axis=1, skipna=True)
+        # X["price_median"] = price_df.median(axis=1, skipna=True)
+        # X["price_std"] = price_df.std(axis=1, skipna=True)
+        # X["price_min"] = price_df.min(axis=1, skipna=True)
+        # X["price_max"] = price_df.max(axis=1, skipna=True)
+        # X["price_range"] = X["price_max"] - X["price_min"]
+        # X["price_missing_count"] = price_df.isna().sum(axis=1)
+        # X["price_present_count"] = price_df.notna().sum(axis=1)
 
         return X
 
@@ -55,9 +59,8 @@ def _build_preprocessor(X):
 
     categorical_transformer = Pipeline(
         steps=[
-            ("imputer", SimpleImputer(strategy="most_frequent")),
-            ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
-        ]
+            # ("imputer", SimpleImputer(strategy="most_frequent")),
+            ("ordinal", OrdinalEncoder(categories=[["spring","summer","autumn","winter"]]))        ]
     )
 
     preprocessor = ColumnTransformer(
@@ -73,9 +76,12 @@ def _build_models():
     models = {}
 
     extra_trees_configs = [
-        (400, None, 1),
-        (700, None, 1),
-        (700, 16, 2),
+        # (2000, None, 1),
+        # (1000, 64, 1),
+        (300, 16, 1),
+        (100, 32, 1),
+        # (300, 16, 1),
+
     ]
     for n_estimators, max_depth, min_leaf in extra_trees_configs:
         name = f"et_n{n_estimators}_d{max_depth}_l{min_leaf}"
@@ -86,7 +92,18 @@ def _build_models():
             random_state=RANDOM_STATE,
             n_jobs=-1,
         )
-
+        
+    # Initialize model
+    models['gbr'] = GradientBoostingRegressor(
+        n_estimators=200,
+        learning_rate=0.01,
+        max_depth=64,
+        min_samples_split=3,
+        min_samples_leaf=1,
+        subsample=0.8,
+        max_features='sqrt',
+        random_state=RANDOM_STATE
+        )
     return models
 
 
@@ -111,7 +128,7 @@ def _build_pipelines(X_df):
 def _fit_stacked_ensemble(X_df, y):
     pipelines = _build_pipelines(X_df)
     model_names = list(pipelines.keys())
-    cv = KFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
+    cv = KFold(n_splits=10, shuffle=True, random_state=RANDOM_STATE)
     oof_matrix = np.zeros((len(y), len(model_names)))
 
     print("\nTraining with 5-fold CV...", flush=True)
@@ -133,7 +150,7 @@ def _fit_stacked_ensemble(X_df, y):
     for name, score in sorted(per_model_r2.items(), key=lambda x: x[1], reverse=True):
         print(f"  {name}: {score:.4f}", flush=True)
 
-    blender = LinearRegression(fit_intercept=False, positive=True)
+    blender = Ridge(alpha=50, fit_intercept=False, positive=True)
     blender.fit(oof_matrix, y)
 
     raw_weights = blender.coef_.copy()
