@@ -15,7 +15,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
 
 from sklearn.ensemble import GradientBoostingRegressor
-
+from sklearn.experimental import enable_iterative_imputer 
+from sklearn.impute import IterativeImputer
 
 
 RANDOM_STATE = 42
@@ -53,7 +54,13 @@ def _build_preprocessor(X):
 
     numeric_transformer = Pipeline(
         steps=[
-            ("imputer", SimpleImputer(strategy="median", add_indicator=True)),
+            ("imputer", IterativeImputer(
+                max_iter=10,
+                random_state=RANDOM_STATE,
+                initial_strategy="median",
+                n_nearest_features=None,
+                imputation_order="ascending"
+            )),
         ]
     )
 
@@ -128,7 +135,7 @@ def _build_pipelines(X_df):
 def _fit_stacked_ensemble(X_df, y):
     pipelines = _build_pipelines(X_df)
     model_names = list(pipelines.keys())
-    cv = KFold(n_splits=10, shuffle=True, random_state=RANDOM_STATE)
+    cv = KFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
     oof_matrix = np.zeros((len(y), len(model_names)))
 
     print("\nTraining with 5-fold CV...", flush=True)
