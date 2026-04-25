@@ -73,6 +73,7 @@ def load_data(**kwargs):
     # training data) with your own implementation.
     train_data_label = train_data.clone()
     train_data_input = train_data.clone()
+    train_data_input[:,:,10:18, 10:18] = 0
 
     # Visualize the training data if needed
     # Set to False if you don't want to save the images
@@ -114,27 +115,27 @@ def training(train_data_input, train_data_label, **kwargs):
 
     # TODO: Dummy criterion - change this to the correct loss function
     # https://pytorch.org/docs/stable/nn.html#loss-functions
-    criterion = lambda x, y: torch.mean((x))
+    criterion = nn.MSELoss()
     # TODO: Dummy optimizer - change this to a more suitable optimizer
-    optimizer = torch.optim.SGD(model.parameters())
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-5)
 
     # TODO: Correctly setup the dataloader - the below is just a placeholder
     # Also consider that you might not want to use the entire dataset for
     # training alone
     # (batch_size needs to be changed)
-    batch_size = 1
+    batch_size = 32
     dataset = TensorDataset(train_data_input, train_data_label)
     # Consider the shuffle parameter and other parameters of the DataLoader
     # class (see
     # https://pytorch.org/docs/stable/data.html#torch.utils.data.DataLoader)
-    data_loader = DataLoader(dataset, batch_size=batch_size)
+    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=2, pin_memory=True)
 
     # Training loop
     # TODO: Modify the training loop in case you need to
 
     # TODO: The value of n_epochs is just a placeholder and likely needs to be
     # changed
-    n_epochs = 1
+    n_epochs = 5
 
     for epoch in range(n_epochs):
         for x, y in tqdm(
@@ -164,7 +165,12 @@ class Model(nn.Module):
         The constructor of the model.
         """
         super().__init__()
-        self.fc = nn.Linear(784, 784)
+        # Feature extractor (encoder)
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=16, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, padding=1)
+
+        # Reconstruction layer (decoder)
+        self.conv3 = nn.Conv2d(in_channels=32, out_channels=1, kernel_size=3, padding=1)
 
     def forward(self, x):
         """
@@ -175,11 +181,11 @@ class Model(nn.Module):
         output: x: torch.Tensor, the output of the model
         """
         # Flatten the image in the last two dimensions
-        x = x.view(x.shape[0], -1)
-        x = self.fc(x)
-        x = F.relu(x)
-        # Reshape the image to the original shape
-        x = x.view(x.shape[0], 1, 28, 28)
+        x = F.relu(self.conv1(x))   # [B, 16, 28, 28]
+        x = F.relu(self.conv2(x))   # [B, 32, 28, 28]
+
+        x = self.conv3(x)           # [B, 1, 28, 28]
+    
         return x
 
 
