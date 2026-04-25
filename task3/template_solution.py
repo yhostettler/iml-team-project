@@ -58,13 +58,13 @@ def load_data(**kwargs):
     train_data = np.load("train_data.npz")["data"]
 
     # Make the training data a tensor
-    train_data = torch.tensor(train_data, dtype=torch.float32)
+    train_data = torch.tensor(train_data, dtype=torch.float32) / 255.0
 
     # Load the test data
     test_data_input = np.load("test_data.npz")["data"]
 
     # Make the test data a tensor
-    test_data_input = torch.tensor(test_data_input, dtype=torch.float32)
+    test_data_input = torch.tensor(test_data_input, dtype=torch.float32) / 255.0
 
     ########################################
     # TODO: Given the original training images, create the input images and the
@@ -77,7 +77,7 @@ def load_data(**kwargs):
 
     # Visualize the training data if needed
     # Set to False if you don't want to save the images
-    if True:
+    if False:
         # Create the output directory if it doesn't exist
         if not Path("train_image_output").exists():
             Path("train_image_output").mkdir()
@@ -123,7 +123,7 @@ def training(train_data_input, train_data_label, **kwargs):
     # Also consider that you might not want to use the entire dataset for
     # training alone
     # (batch_size needs to be changed)
-    batch_size = 32
+    batch_size = 128
     dataset = TensorDataset(train_data_input, train_data_label)
     # Consider the shuffle parameter and other parameters of the DataLoader
     # class (see
@@ -133,9 +133,16 @@ def training(train_data_input, train_data_label, **kwargs):
     # Training loop
     # TODO: Modify the training loop in case you need to
 
+
     # TODO: The value of n_epochs is just a placeholder and likely needs to be
     # changed
-    n_epochs = 5
+    n_epochs = 20
+
+
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer,
+        T_max=n_epochs
+    )
 
     for epoch in range(n_epochs):
         for x, y in tqdm(
@@ -148,6 +155,7 @@ def training(train_data_input, train_data_label, **kwargs):
             loss.backward()
             optimizer.step()
 
+        scheduler.step()
         print(f"Epoch {epoch} loss: {loss.item()}")
 
     return model
@@ -165,12 +173,10 @@ class Model(nn.Module):
         The constructor of the model.
         """
         super().__init__()
-        # Feature extractor (encoder)
-        self.conv1 = nn.Conv2d(in_channels=1, out_channels=16, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, padding=1)
-
-        # Reconstruction layer (decoder)
-        self.conv3 = nn.Conv2d(in_channels=32, out_channels=1, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv2d(1, 32, 3, padding=1)
+        self.conv2 = nn.Conv2d(32, 64, 3, padding=1)
+        self.conv3 = nn.Conv2d(64, 32, 3, padding=1)
+        self.conv4 = nn.Conv2d(32, 1, 3, padding=1)
 
     def forward(self, x):
         """
@@ -180,12 +186,15 @@ class Model(nn.Module):
 
         output: x: torch.Tensor, the output of the model
         """
-        # Flatten the image in the last two dimensions
-        x = F.relu(self.conv1(x))   # [B, 16, 28, 28]
-        x = F.relu(self.conv2(x))   # [B, 32, 28, 28]
+        skip = x  # save input
 
-        x = self.conv3(x)           # [B, 1, 28, 28]
-    
+        # Flatten the image in the last two dimensions
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = F.relu(self.conv3(x))
+
+        x = self.conv4(x)
+        x = torch.sigmoid(x)
         return x
 
 
@@ -231,6 +240,7 @@ def testing(model, test_data_input):
 
     # Save the output
     test_data_output = test_data_output.numpy()
+    test_data_output = test_data_output * 255.0
     # Ensure all values are in the range [0, 255]
     save_data_clipped = np.clip(test_data_output, 0, 255)
     # Convert to uint8
