@@ -189,12 +189,10 @@ class Model(nn.Module):
         self.enc2 = DoubleConv(32, 64)
         self.enc3 = DoubleConv(64, 128)
 
-        # IMPORTANT: ceil_mode=True prevents size shrinking mismatch
         self.pool = nn.MaxPool2d(2, ceil_mode=True)
-
         self.bottleneck = DoubleConv(128, 256)
 
-        # Decoder (careful upsampling)
+        # Decoder
         self.up3 = nn.ConvTranspose2d(256, 128, 2, stride=2)
         self.dec3 = DoubleConv(256, 128)
 
@@ -207,6 +205,7 @@ class Model(nn.Module):
         self.out = nn.Conv2d(32, 1, 1)
 
     def forward(self, x):
+        
         # Encoder
         e1 = self.enc1(x)
         e2 = self.enc2(self.pool(e1))
@@ -216,8 +215,6 @@ class Model(nn.Module):
 
         # Decoder
         d3 = self.up3(b)
-
-        # SAFE ALIGNMENT (automatic fix for off-by-1)
         d3 = self._match_size(d3, e3)
         d3 = torch.cat([d3, e3], dim=1)
         d3 = self.dec3(d3)
